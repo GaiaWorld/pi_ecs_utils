@@ -1,0 +1,24 @@
+[package]
+name = "pi_ecs_utils"
+version = "0.1.0"
+authors = ["suncy <suncy@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+pi_null="0.1"
+pi_ecs="0.1"
+pi_slotmap_tree="0.2"
+derive_deref = "1.1"
+pi_dirty="0.1"
+pi_ecs_macros="0.1"
+pi_hash="0.1"
+pi_map="0.1"
+
+[dev-dependencies]
+pi_async_graph = "0.1"
+pi_async = "0.1"
+
+[patch.crates-io]
+pi_ecs = { path = "../pi_ecs" }
+pi_slotmap_tree = { path = "../pi_slotmap_tree" }
+pi_dirty = { path = "../pi_dirty" }
