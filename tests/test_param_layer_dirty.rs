@@ -14,7 +14,7 @@ use pi_null::Null;
 #[derive(Default)]
 pub struct Node;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 /// 定义一个组件类型
 pub struct Name(pub String);
 
