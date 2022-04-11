@@ -22,8 +22,8 @@ pi_dirty = { git = "https://github.com/GaiaWorld/pi_dirty.git" }
 pi_async_graph = "0.1"
 pi_async = "0.1"
 
-[patch."https://github.com/GaiaWorld/pi_ecs"]
-pi_ecs = { path = "../pi_ecs" }
+# [patch."https://github.com/GaiaWorld/pi_ecs"]
+# pi_ecs = { path = "../pi_ecs" }
 # [patch.crates-io]
 # pi_ecs_macros = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 # pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
