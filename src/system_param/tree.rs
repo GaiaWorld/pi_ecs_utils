@@ -168,6 +168,7 @@ impl<A: ArchetypeIdent> StorageMut<Entity> for IdtreeMutState<A> {
 		)} {
 			let parent = up.parent();
 			write_item.write(up);
+			
 
 			let parent_layer = unsafe { self.0.layer_query.get_unchecked(
 				&self.0.world, 

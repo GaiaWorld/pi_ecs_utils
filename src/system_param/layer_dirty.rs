@@ -261,7 +261,7 @@ where
 					let e = Entity::new(self.archetype_id, local.clone());
 					if let Some(r) = self.tree.get_layer(e) {
 						if *r == layer {
-							return Some((e, unsafe { transmute(&mut self.mark_inner) }));
+							return Some((e, unsafe { transmute(self.mark_inner as *mut SecondaryMap<LocalVersion, usize> as usize as *mut SecondaryMap<LocalVersion, usize>) }));
 						}
 					}
 				}
@@ -360,14 +360,14 @@ pub trait InstallLayerListen: FilterFetch {
 	/// 安装监听器，收到事件设脏
 	/// 安全：
 	///  * 保证layer在监听器删除之前，该指针不会被销毁
-	unsafe fn install<A: ArchetypeIdent>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &Self::State);
+	unsafe fn install<A: ArchetypeIdent>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &<Self as Fetch>::State);
 }
 
 macro_rules! impl_install {
     ($name: ident, $listen: ty) => {
 		impl<T: Component> InstallLayerListen for $name<T>{
 	
-			unsafe fn install<A: ArchetypeIdent>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &Self::State) {
+			unsafe fn install<A: ArchetypeIdent>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &<Self as Fetch>::State) {
 				let layer = layer as usize;
 				let layer_obj = &mut *(layer as *mut LayerDirtyInner);
 				if let None = layer_obj.is_install.get(&state.component_id) {
@@ -401,7 +401,7 @@ macro_rules! impl_query_listen_tuple {
         #[allow(unused_variables)]
         #[allow(non_snake_case)]
         impl<$($filter: InstallLayerListen),*> InstallLayerListen for ($($filter,)*) {
-			unsafe fn install<A>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &Self::State) where 
+			unsafe fn install<A>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &<Self as Fetch>::State) where 
 				A: ArchetypeIdent {
 				let ($($filter,)*) = self;
 				let ($($state,)*) = state;
@@ -412,7 +412,7 @@ macro_rules! impl_query_listen_tuple {
 		#[allow(unused_variables)]
         #[allow(non_snake_case)]
 		impl< $($filter: InstallLayerListen),*> InstallLayerListen for Or<($(OrFetch<$filter>,)*)> {
-			unsafe fn install<A>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &Self::State)
+			unsafe fn install<A>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &<Self as Fetch>::State)
 			where 
 				A: ArchetypeIdent {
 				let ($($filter,)*) = &self.0;
