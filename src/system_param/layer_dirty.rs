@@ -556,7 +556,7 @@ unsafe impl<A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamState for Arc
     fn default_config() {}
 }
 
-impl<'a, A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamFetch<'a> for ArcLayerDirtyState<A, F>
+impl<'w, 's, A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamFetch<'w, 's> for ArcLayerDirtyState<A, F>
 	where 
 		F::State: FetchState,
 		F::Fetch: InstallLayerListen + FilterFetch{
@@ -564,9 +564,9 @@ impl<'a, A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamFetch<'a> for Ar
 
     #[inline]
     unsafe fn get_param(
-        state: &'a mut Self,
-        system_state: &'a SystemState,
-        world: &'a World,
+        state: &'s mut Self,
+        system_state: &SystemState,
+        world: &'w World,
         change_tick: u32,
     ) -> Self::Item {
 		LayerDirty::new(world, ArcLayerDirtyState(state.0.clone()), system_state.last_change_tick(), change_tick)
