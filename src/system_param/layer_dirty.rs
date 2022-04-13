@@ -535,7 +535,7 @@ unsafe impl<A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamState for Arc
 			// 监听Layer组件（泛型C，实现了GetLayer trait）
 			let listen = move |
 				event: Event,
-				_: Listen<ComponentListen<A, Layer, (Create, Modify)>>,
+				_: Listen<ComponentListen<A, Layer, Modify>>,
 				// layers: Query<A, &C>,
 			| {
 				// 标记层脏

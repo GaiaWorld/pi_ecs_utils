@@ -166,18 +166,7 @@ impl<A: ArchetypeIdent> StorageMut<Entity> for IdtreeMutState<A> {
 			self.0.last_change_tick, 
 			self.0.change_tick
 		)} {
-			let parent = up.parent();
 			write_item.write(up);
-			
-
-			let parent_layer = unsafe { self.0.layer_query.get_unchecked(
-				&self.0.world, 
-				parent
-			)};
-			// parent layer存在
-			if parent_layer.get().is_some() {
-				write_item.notify_modify();
-			}
 		}
 	}
 

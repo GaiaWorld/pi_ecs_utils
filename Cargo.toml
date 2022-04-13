@@ -22,6 +22,9 @@ pi_dirty = { git = "https://github.com/GaiaWorld/pi_dirty.git" }
 pi_async_graph = "0.1"
 pi_async = "0.1"
 
+[patch."https://github.com/GaiaWorld/pi_slotmap_tree"]
+pi_slotmap_tree = { path = "../pi_slotmap_tree" }
+
 # [patch."https://github.com/GaiaWorld/pi_ecs"]
 # pi_ecs = { path = "../pi_ecs" }
 # [patch.crates-io]
