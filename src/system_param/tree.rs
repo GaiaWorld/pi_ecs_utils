@@ -333,14 +333,14 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeState<A> {
     fn default_config() {}
 }
 
-impl<'a, A: ArchetypeIdent> SystemParamFetch<'a> for IdtreeState<A> {
+impl<'w, 's, A: ArchetypeIdent> SystemParamFetch<'w, 's> for IdtreeState<A> {
     type Item = EntityTree<A>;
 
     #[inline]
     unsafe fn get_param(
-        state: &'a mut Self,
-        _system_state: &'a SystemState,
-        _world: &'a World,
+        state: &'s mut Self,
+        _system_state: &SystemState,
+        _world: &'w World,
         _change_tick: u32,
     ) -> Self::Item {
 		EntityTree(Tree::new(IdtreeState(state.0.clone())))
@@ -401,14 +401,14 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeMutState<A> {
     fn default_config() {}
 }
 
-impl<'a, A: ArchetypeIdent> SystemParamFetch<'a> for IdtreeMutState<A> {
+impl<'w, 's, A: ArchetypeIdent> SystemParamFetch<'w, 's> for IdtreeMutState<A> {
     type Item = EntityTreeMut<A>;
 
     #[inline]
     unsafe fn get_param(
-        state: &'a mut Self,
-        _system_state: &'a SystemState,
-        _world: &'a World,
+        state: &'s mut Self,
+        _system_state: &SystemState,
+        _world: &'w World,
         _change_tick: u32,
     ) -> Self::Item {
 		EntityTreeMut(Tree::new(IdtreeMutState(state.0.clone())))

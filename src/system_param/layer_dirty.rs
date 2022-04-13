@@ -380,7 +380,7 @@ macro_rules! impl_install {
 						// layers: Query<A, &C>
 					| {
 						// 标记层脏
-						unsafe{&mut *(layer as *mut LayerDirtyInner)}.insert(event.id, &idtree);
+						(&mut *(layer as *mut LayerDirtyInner)).insert(event.id, &idtree);
 					};
 					// 标记监听器已经设置，下次不需要重复设置（同一个查询可能涉及到多次相同组件的过滤）
 					// layer_obj.is_install.insert(component_id, ());
@@ -556,7 +556,7 @@ unsafe impl<A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamState for Arc
     fn default_config() {}
 }
 
-impl<'a, A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamFetch<'a> for ArcLayerDirtyState<A, F>
+impl<'w, 's, A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamFetch<'w, 's> for ArcLayerDirtyState<A, F>
 	where 
 		F::State: FetchState,
 		F::Fetch: InstallLayerListen + FilterFetch{
@@ -564,9 +564,9 @@ impl<'a, A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamFetch<'a> for Ar
 
     #[inline]
     unsafe fn get_param(
-        state: &'a mut Self,
-        system_state: &'a SystemState,
-        world: &'a World,
+        state: &'s mut Self,
+        system_state: &SystemState,
+        world: &'w World,
         change_tick: u32,
     ) -> Self::Item {
 		LayerDirty::new(world, ArcLayerDirtyState(state.0.clone()), system_state.last_change_tick(), change_tick)
