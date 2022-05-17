@@ -3,7 +3,8 @@ use std::slice::Iter;
 use std::{marker::PhantomData, sync::Arc, any::TypeId};
 
 use pi_dirty::{LayerDirty as LayerDirty1, DirtyIterator, ReverseDirtyIterator, PreDirty, NextDirty};
-use pi_ecs::prelude::filter_change::{AddedFetch, ModifyedFetch};
+use pi_ecs::monitor::Delete;
+use pi_ecs::prelude::{AddedFetch, ModifyedFetch, DeletedFetch};
 use pi_ecs_macros::all_tuples;
 use pi_hash::XHashMap;
 use pi_map::Map;
@@ -16,9 +17,9 @@ use pi_ecs::{
 		system::SystemState, 
 		param::{SystemParamState}
 	},
-	storage::{LocalVersion, SecondaryMap, Local}, 
+	storage::{SecondaryMap, Local}, 
 	monitor::{Event, ComponentListen, Create, Modify, Listen, Listeners,ListenSetup},
-	prelude::{FetchState, Fetch, WorldQuery, FilterFetch, filter_change::ChangedFetch, Or, OrFetch}, entity::Entity, archetype::{ArchetypeIdent},
+	prelude::{FetchState, Fetch, WorldQuery, FilterFetch, ChangedFetch, Or, OrFetch}, entity::Id, archetype::{ArchetypeIdent},
 };
 use pi_ecs::sys::param::{assert_component_access_compatibility, SystemParam};
 use pi_slotmap_tree::{RecursiveIterator, Storage};
@@ -64,7 +65,7 @@ impl<A: ArchetypeIdent, F: WorldQuery> LayerDirty<A, F> {
 			mark_inner: &mut state.layer_inner.dirty_mark,
 			pre_iter: None,
 			tree: &state.tree_state,
-			archetype_id: state.archetype_id,
+			// archetype_id: state.archetype_id,
 			mark: PhantomData,
 		}
 	}
@@ -79,7 +80,7 @@ impl<A: ArchetypeIdent, F: WorldQuery> LayerDirty<A, F> {
 			iter_inner: state.layer_inner.layer_list.iter(),
 			mark_inner: &mut state.layer_inner.dirty_mark,
 			tree: &state.tree_state,
-			archetype_id: state.archetype_id,
+			// archetype_id: state.archetype_id,
 			mark: PhantomData,
 		}
 	}
@@ -105,7 +106,7 @@ impl<A: ArchetypeIdent, F: WorldQuery> LayerDirty<A, F> {
 		state.layer_inner.layer_list.end()
 	}
 
-	pub fn split(&mut self, layer: usize) -> (RemainDirty, OutDirty) {
+	pub fn split(&mut self, layer: usize) -> (RemainDirty<A>, OutDirty<A>) {
 		let state = unsafe {
 			&mut *(Arc::as_ptr(&self.state.0) as usize as *mut LayerDirtyState<A, F>)
 		};
@@ -122,57 +123,57 @@ impl<A: ArchetypeIdent, F: WorldQuery> LayerDirty<A, F> {
 			iter_inner: state.layer_inner.layer_list.iter_reverse(),
 			mark_inner: &mut state.layer_inner.dirty_mark,
 			tree: &state.tree_state,
-			archetype_id: state.archetype_id,
+			// archetype_id: state.archetype_id,
 			mark: PhantomData,
 		}
 	}
 }
 
-pub struct OutDirty<'a>(NextDirty<'a, LocalVersion>, Local);
-pub struct RemainDirty<'a>(PreDirty<'a, LocalVersion>);
+pub struct OutDirty<'a, A: ArchetypeIdent>(NextDirty<'a, Id<A>>, Local);
+pub struct RemainDirty<'a, A: ArchetypeIdent>(PreDirty<'a, Id<A>>);
 
-impl<'a> OutDirty<'a> {
-	pub fn iter(&'a self) -> OutDirtyIter<'a> {
+impl<'a, A: ArchetypeIdent> OutDirty<'a, A> {
+	pub fn iter(&'a self) -> OutDirtyIter<'a, A> {
 		let i = self.0.iter();
-		OutDirtyIter(i, self.1)
+		OutDirtyIter(i)
 	}	
 }
 
-pub struct OutDirtyIter<'a>(Iter<'a, LocalVersion>, Local);
+pub struct OutDirtyIter<'a, A: ArchetypeIdent>(Iter<'a, Id<A>>);
 
-impl<'a> Iterator for OutDirtyIter<'a>{
-    type Item = Entity;
+impl<'a, A: ArchetypeIdent> Iterator for OutDirtyIter<'a, A>{
+    type Item = Id<A>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
 		match self.0.next() {
-			Some(r) => Some(Entity::new(self.1, r.clone())),
+			Some(r) => Some(r.clone()),
 			None => None
 		}
 	}
 }
 
-impl<'a> RemainDirty<'a>{
-    pub fn mark(&mut self, id: Entity, layer: usize) {
-        self.0.mark(id.local(), layer);
+impl<'a, A: ArchetypeIdent> RemainDirty<'a, A>{
+    pub fn mark(&mut self, id: Id<A>, layer: usize) {
+        self.0.mark(id, layer);
     }
 
-    pub fn delete(&mut self, id: Entity, layer: usize) {
-        self.0.delete(id.local(), layer);
+    pub fn delete(&mut self, id: Id<A>, layer: usize) {
+        self.0.delete(id, layer);
     }
 }
 
 pub struct AutoLayerDirtyIter<'s, A: ArchetypeIdent, F: WorldQuery> {
 	mark: PhantomData<&'s (A, F)>,
 	matchs: bool,
-	iter_inner: DirtyIterator<'s, LocalVersion>,
+	iter_inner: DirtyIterator<'s, Id<A>>,
 
-	mark_inner: &'s mut SecondaryMap<LocalVersion, usize>,
+	mark_inner: &'s mut SecondaryMap<Id<A>, usize>,
 
 	tree: &'s EntityTree<A>,
-	archetype_id: Local,
+	// archetype_id: Local,
 
-	pre_iter: Option<RecursiveIterator<'s, Entity, IdtreeState<A>>>,
+	pre_iter: Option<RecursiveIterator<'s, Id<A>, IdtreeState<A>>>,
 	// layers: &'s mut  ReadFetch<C>,
 }
 
@@ -180,7 +181,7 @@ impl<'s, A: ArchetypeIdent, F: WorldQuery> Iterator for AutoLayerDirtyIter<'s, A
 where
 	F::Fetch: FilterFetch,
 {
-    type Item = Entity;
+    type Item = Id<A>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -191,7 +192,7 @@ where
 			// 上次迭代的脏还没完成，继续迭代
 			match r.next() {
 				Some(next) => {
-					self.mark_inner.remove(&next.local()); // 标记为不脏
+					self.mark_inner.remove(&next); // 标记为不脏
 					return Some(next)
 				},
 				None => self.pre_iter = None
@@ -207,16 +208,15 @@ where
 
 				// 记录的层次和实际层次相等，并且在idtree中的层次也相等，则返回该值
 				if layer == layer1{
-					let e = Entity::new(self.archetype_id, local.clone());
-					if let Some(r) = self.tree.get_layer(e) {
+					if let Some(r) = self.tree.get_layer(*local) {
 						if *r == layer {
 							// 是否判断changed？TODO
 							// 记录上次迭代出的实体id，下次将对该节点在itree进行先序迭代
-							if let Some(down) = self.tree.get_down(e) {
+							if let Some(down) = self.tree.get_down(*local) {
 								let head = down.head;
 								self.pre_iter = Some(self.tree.recursive_iter(head));
 							}
-							return Some(e);
+							return Some(*local);
 						}
 					}
 				}
@@ -230,19 +230,18 @@ where
 pub struct ManualLayerDirtyIter<'s, A: ArchetypeIdent, F: WorldQuery> {
 	mark: PhantomData<&'s (A, F)>,
 	matchs: bool,
-	iter_inner: DirtyIterator<'s, LocalVersion>,
+	iter_inner: DirtyIterator<'s, Id<A>>,
 
-	mark_inner: &'s mut SecondaryMap<LocalVersion, usize>,
+	mark_inner: &'s mut SecondaryMap<Id<A>, usize>,
 
 	tree: &'s EntityTree<A>,
-	archetype_id: Local,
 }
 
 impl<'s, A: ArchetypeIdent, F: WorldQuery> Iterator for ManualLayerDirtyIter<'s, A, F>
 where
 	F::Fetch: FilterFetch,
 {
-    type Item = (Entity, &'s mut SecondaryMap<LocalVersion, usize>);
+    type Item = (Id<A>, &'s mut SecondaryMap<Id<A>, usize>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -258,10 +257,9 @@ where
 
 				// 记录的层次和实际层次相等，并且在idtree中的层次也相等，则返回该值
 				if layer == layer1{
-					let e = Entity::new(self.archetype_id, local.clone());
-					if let Some(r) = self.tree.get_layer(e) {
+					if let Some(r) = self.tree.get_layer(local.clone()) {
 						if *r == layer {
-							return Some((e, unsafe { transmute(self.mark_inner as *mut SecondaryMap<LocalVersion, usize> as usize as *mut SecondaryMap<LocalVersion, usize>) }));
+							return Some((local.clone(), unsafe { transmute(self.mark_inner as *mut SecondaryMap<Id<A>, usize> as usize as *mut SecondaryMap<Id<A>, usize>) }));
 						}
 					}
 				}
@@ -275,19 +273,18 @@ where
 pub struct LayerReverseDirtyIter<'s, A: ArchetypeIdent, F: WorldQuery> {
 	mark: PhantomData<&'s (A, F)>,
 	matchs: bool,
-	iter_inner: ReverseDirtyIterator<'s, LocalVersion>,
+	iter_inner: ReverseDirtyIterator<'s, Id<A>>,
 
-	mark_inner: &'s mut SecondaryMap<LocalVersion, usize>,
+	mark_inner: &'s mut SecondaryMap<Id<A>, usize>,
 
 	tree: &'s EntityTree<A>,
-	archetype_id: Local,
 }
 
 impl<'s, A: ArchetypeIdent, F: WorldQuery> Iterator for LayerReverseDirtyIter<'s, A, F>
 where
 	F::Fetch: FilterFetch,
 {
-    type Item = Entity;
+    type Item = Id<A>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -302,12 +299,11 @@ where
 
 				// 记录的层次和实际层次相等，并且在idtree中的层次也相等，则返回该值
 				if layer == layer1{
-					let e = Entity::new(self.archetype_id, local.clone());
-					if let Some(r) = self.tree.get_layer(e) {
+					if let Some(r) = self.tree.get_layer(local.clone()) {
 						if *r == layer {
 							// 是否判断changed？TODO
 							// 记录上次迭代出的实体id，下次将对该节点在itree进行先序迭代
-							return Some(e);
+							return Some(local.clone());
 						}
 					}
 				}
@@ -317,14 +313,14 @@ where
 	}
 }
 
-pub struct LayerDirtyInner{
-	pub(crate) layer_list: LayerDirty1<LocalVersion>, // 脏列表
-	pub(crate) dirty_mark: SecondaryMap<LocalVersion, usize>,
+pub struct LayerDirtyInner<A: ArchetypeIdent>{
+	pub(crate) layer_list: LayerDirty1<Id<A>>, // 脏列表
+	pub(crate) dirty_mark: SecondaryMap<Id<A>, usize>,
 	// 已经安装过监听器的组件不需要再安装（用于记录已安装监听器的组件的ComponentId）
 	pub(crate) is_install: XHashMap<ComponentId, ()>,
 }
 
-impl LayerDirtyInner {
+impl<A: ArchetypeIdent> LayerDirtyInner<A> {
 	pub fn new() -> Self {
 		Self {
 			layer_list: LayerDirty1::default(),
@@ -332,22 +328,22 @@ impl LayerDirtyInner {
 			is_install: XHashMap::default(),
 		}
 	}
-	pub fn insert<A: ArchetypeIdent>(&mut self, id: Entity, tree: &EntityTree<A>) {
+	pub fn insert(&mut self, id: Id<A>, tree: &EntityTree<A>) {
 		match tree.get_layer(id) {
             Some(r) => {
                 if *r != 0 {
-					let d = match self.dirty_mark.get_mut(&id.local()) {
+					let d = match self.dirty_mark.get_mut(&id) {
 						Some(r) => r,
 						None => {
 							// 如果dirty_mark中不存在id，需要新创建
-							self.dirty_mark.insert(id.local(), 0);
-							&mut self.dirty_mark[id.local()]
+							self.dirty_mark.insert(id, 0);
+							&mut self.dirty_mark[id]
 						},
 					};
 					// 新的layer和旧的layer不相等，则记录新的（不删除原来的，在迭代层次脏时，会重现判断层，原有的会自动失效）
                     if *d != *r {
                         *d = *r;
-                        self.layer_list.mark(id.local(), *r);
+                        self.layer_list.mark(id, *r);
                     }
                 }
             }
@@ -360,16 +356,16 @@ pub trait InstallLayerListen: FilterFetch {
 	/// 安装监听器，收到事件设脏
 	/// 安全：
 	///  * 保证layer在监听器删除之前，该指针不会被销毁
-	unsafe fn install<A: ArchetypeIdent>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &<Self as Fetch>::State);
+	unsafe fn install<A: ArchetypeIdent>(&self, world: &mut World, layer: *const LayerDirtyInner<A>, idtree: EntityTree<A>, state: &<Self as Fetch>::State);
 }
 
 macro_rules! impl_install {
     ($name: ident, $listen: ty) => {
 		impl<T: Component> InstallLayerListen for $name<T>{
 	
-			unsafe fn install<A: ArchetypeIdent>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &<Self as Fetch>::State) {
+			unsafe fn install<A: ArchetypeIdent>(&self, world: &mut World, layer: *const LayerDirtyInner<A>, idtree: EntityTree<A>, state: &<Self as Fetch>::State) {
 				let layer = layer as usize;
-				let layer_obj = &mut *(layer as *mut LayerDirtyInner);
+				let layer_obj = &mut *(layer as *mut LayerDirtyInner<A>);
 				if let None = layer_obj.is_install.get(&state.component_id) {
 					// let component_id = state.component_id;
 		
@@ -380,7 +376,7 @@ macro_rules! impl_install {
 						// layers: Query<A, &C>
 					| {
 						// 标记层脏
-						(&mut *(layer as *mut LayerDirtyInner)).insert(event.id, &idtree);
+						(&mut *(layer as *mut LayerDirtyInner<A>)).insert(Id::new(event.id.local()) , &idtree);
 					};
 					// 标记监听器已经设置，下次不需要重复设置（同一个查询可能涉及到多次相同组件的过滤）
 					// layer_obj.is_install.insert(component_id, ());
@@ -395,13 +391,14 @@ macro_rules! impl_install {
 impl_install!(ChangedFetch, (Create, Modify));
 impl_install!(AddedFetch, Create);
 impl_install!(ModifyedFetch, Modify);
+impl_install!(DeletedFetch, Delete);
 
 macro_rules! impl_query_listen_tuple {
     ($(($filter: ident, $state: ident)),*) => {
         #[allow(unused_variables)]
         #[allow(non_snake_case)]
         impl<$($filter: InstallLayerListen),*> InstallLayerListen for ($($filter,)*) {
-			unsafe fn install<A>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &<Self as Fetch>::State) where 
+			unsafe fn install<A>(&self, world: &mut World, layer: *const LayerDirtyInner<A>, idtree: EntityTree<A>, state: &<Self as Fetch>::State) where 
 				A: ArchetypeIdent {
 				let ($($filter,)*) = self;
 				let ($($state,)*) = state;
@@ -412,7 +409,7 @@ macro_rules! impl_query_listen_tuple {
 		#[allow(unused_variables)]
         #[allow(non_snake_case)]
 		impl< $($filter: InstallLayerListen),*> InstallLayerListen for Or<($(OrFetch<$filter>,)*)> {
-			unsafe fn install<A>(&self, world: &mut World, layer: *const LayerDirtyInner, idtree: EntityTree<A>, state: &<Self as Fetch>::State)
+			unsafe fn install<A>(&self, world: &mut World, layer: *const LayerDirtyInner<A>, idtree: EntityTree<A>, state: &<Self as Fetch>::State)
 			where 
 				A: ArchetypeIdent {
 				let ($($filter,)*) = &self.0;
@@ -426,7 +423,7 @@ all_tuples!(impl_query_listen_tuple, 0, 15, F, S);
 
 
 pub struct LayerDirtyState<A: ArchetypeIdent, F: WorldQuery> {
-	pub(crate) layer_inner: LayerDirtyInner, // 脏列表
+	pub(crate) layer_inner: LayerDirtyInner<A>, // 脏列表
 	pub(crate) inner_state: F::State,
 	pub(crate) inner_fetch: F::Fetch,
 
@@ -450,12 +447,9 @@ unsafe impl<A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamState for Arc
 	/// 添加监听器监听数据的改变，进行脏设置
     fn init(world: &mut World, system_state: &mut SystemState, _config: Self::Config) -> Self {
 		let (last_change_tick, change_tick) = (world.last_change_tick(), world.change_tick());
-		let mut component_access = Default::default();
 		let mut archetype_component_access = Default::default();
 		let archetype_id = world.archetypes_mut().get_or_create_archetype::<A>();
 		let state = F::State::init(world, 0, archetype_id);
-		state.update_component_access(&mut component_access);
-        state.update_component_access(&mut component_access);
 
 		// let layer_state = ReadState::<C>::init(world, 0);
 		let mut tree_state = IdtreeState::<A>::init(world, system_state, ());
@@ -510,21 +504,17 @@ unsafe impl<A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamState for Arc
             &system_state.name(),
             std::any::type_name::<LayerDirty::<A, F>>(),
             std::any::type_name::<LayerDirty::<A, F>>(),
-            &system_state.component_access_set(),
-            &component_access,
+            system_state.archetype_component_access(),
+            &archetype_component_access,
             world,
         );
-		// 将查询访问的组件集添加到系统访问的组件集中
-        system_state
-            .component_access_set_mut()
-            .add(component_access);
 		// 将查询访问的原型组件放入系统的原型组件集中（用于检查系统与系统的访问组件是否冲突，访问不同原型的同类型组件是允许的）
         system_state
-            .archetype_component_access_mut()
-            .extend(&archetype_component_access);
+            .archetype_component_access_mut().combined_access_mut()
+            .extend(&archetype_component_access.access());
 
 		if is_matchs {
-			let inner = &r.layer_inner as *const LayerDirtyInner;
+			let inner = &r.layer_inner as *const LayerDirtyInner<A>;
 			let state = unsafe{&*( &r.inner_state as *const F::State) };
 
 			// 监听
@@ -539,7 +529,7 @@ unsafe impl<A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamState for Arc
 				// layers: Query<A, &C>,
 			| {
 				// 标记层脏
-				unsafe{&mut *(inner as *mut LayerDirtyInner)}.insert(event.id, &tree1);
+				unsafe{&mut *(inner as *mut LayerDirtyInner<A>)}.insert(unsafe { Id::new(event.id.local())}, &tree1);
 			};
 			let l = listen.listeners();
 			l.setup(world);
