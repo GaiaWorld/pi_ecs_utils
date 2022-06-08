@@ -250,22 +250,25 @@ where
 		}
 
 		// 上一个子树迭代完成，继续迭代下一个脏
-		let item = self.iter_inner.next();
-		if let Some((local, layer)) = item {
-			if let Some(layer1) = self.mark_inner.get(local) {
-				let layer1 = *layer1;
+		loop {
+			let item = self.iter_inner.next();
+			if let Some((local, layer)) = item {
+				if let Some(layer1) = self.mark_inner.get(local) {
+					let layer1 = *layer1;
 
-				// 记录的层次和实际层次相等，并且在idtree中的层次也相等，则返回该值
-				if layer == layer1{
-					if let Some(r) = self.tree.get_layer(local.clone()) {
-						if *r == layer {
-							return Some((local.clone(), unsafe { transmute(self.mark_inner as *mut SecondaryMap<Id<A>, usize> as usize as *mut SecondaryMap<Id<A>, usize>) }));
+					// 记录的层次和实际层次相等，并且在idtree中的层次也相等，则返回该值
+					if layer == layer1{
+						if let Some(r) = self.tree.get_layer(local.clone()) {
+							if *r == layer {
+								return Some((local.clone(), unsafe { transmute(self.mark_inner as *mut SecondaryMap<Id<A>, usize> as usize as *mut SecondaryMap<Id<A>, usize>) }));
+							}
 						}
 					}
 				}
+			} else {
+				return None;
 			}
 		}
-		return None;
     }
 }
 
