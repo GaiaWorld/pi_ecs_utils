@@ -241,7 +241,7 @@ impl<'s, A: ArchetypeIdent, F: WorldQuery> Iterator for ManualLayerDirtyIter<'s,
 where
 	F::Fetch: FilterFetch,
 {
-    type Item = (Id<A>, &'s mut SecondaryMap<Id<A>, usize>);
+    type Item = (Id<A>, &'s mut SecondaryMap<Id<A>, usize>, usize);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -260,7 +260,7 @@ where
 					if layer == layer1{
 						if let Some(r) = self.tree.get_layer(local.clone()) {
 							if *r == layer {
-								return Some((local.clone(), unsafe { transmute(self.mark_inner as *mut SecondaryMap<Id<A>, usize> as usize as *mut SecondaryMap<Id<A>, usize>) }));
+								return Some((local.clone(), unsafe { transmute(self.mark_inner as *mut SecondaryMap<Id<A>, usize> as usize as *mut SecondaryMap<Id<A>, usize>) }, *r));
 							}
 						}
 					}
