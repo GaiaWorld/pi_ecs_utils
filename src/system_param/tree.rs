@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc, intrinsics::transmute};
 
 use derive_deref::{Deref, DerefMut};
 use pi_ecs::{entity::Id, archetype::ArchetypeIdent, prelude::{QueryState, World, Write, SystemParamState, SystemState, SystemParamFetch, SystemParam}};
 use pi_slotmap_tree::{Up, Down, Storage, StorageMut, Tree};
+// use pi_print_any::{println_any, out_any};
 
 #[derive(Debug, Clone, Copy, Deref, Default)]
 pub struct Layer(usize);
@@ -328,10 +329,14 @@ impl<'w, 's, A: ArchetypeIdent> SystemParamFetch<'w, 's> for IdtreeState<A> {
     #[inline]
     unsafe fn get_param(
         state: &'s mut Self,
-        _system_state: &SystemState,
-        _world: &'w World,
-        _change_tick: u32,
+        system_state: &SystemState,
+        world: &'w World,
+        change_tick: u32,
     ) -> Self::Item {
+		let r = unsafe {&mut *(&*state.0 as *const TreeStorage<A> as usize as *mut TreeStorage<A>)};
+		r.up_query.setting(world, system_state.last_change_tick, change_tick);
+		r.down_query.setting(world, system_state.last_change_tick, change_tick);
+		r.layer_query.setting(world, system_state.last_change_tick, change_tick);
 		EntityTree(Tree::new(IdtreeState(state.0.clone())))
     }
 }
@@ -396,10 +401,14 @@ impl<'w, 's, A: ArchetypeIdent> SystemParamFetch<'w, 's> for IdtreeMutState<A> {
     #[inline]
     unsafe fn get_param(
         state: &'s mut Self,
-        _system_state: &SystemState,
-        _world: &'w World,
-        _change_tick: u32,
+        system_state: &SystemState,
+        world: &'w World,
+        change_tick: u32,
     ) -> Self::Item {
+		let r = unsafe {&mut *(&*state.0 as *const TreeStorageMut<A> as usize as *mut TreeStorageMut<A>)};
+		r.up_query.setting(world, system_state.last_change_tick, change_tick);
+		r.down_query.setting(world, system_state.last_change_tick, change_tick);
+		r.layer_query.setting(world, system_state.last_change_tick, change_tick);
 		EntityTreeMut(Tree::new(IdtreeMutState(state.0.clone())))
     }
 }

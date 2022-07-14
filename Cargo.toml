@@ -9,6 +9,7 @@ pi_null="0.1"
 derive_deref = "1.1"
 pi_hash="0.1"
 pi_map="0.1"
+pi_print_any="0.1"
 # pi_ecs_macros="0.1"
 # pi_dirty="0.1"
 # pi_ecs="0.1"
@@ -32,3 +33,7 @@ pi_async = "0.1"
 # pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 # pi_slotmap_tree = { git = "https://github.com/GaiaWorld/pi_slotmap_tree.git" }
 # pi_dirty = { git = "https://github.com/GaiaWorld/pi_dirty.git" }
+
+[net]
+git-fetch-with-cli = true
+offline = true
