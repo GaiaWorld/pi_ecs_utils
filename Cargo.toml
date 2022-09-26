@@ -12,16 +12,16 @@ pi_map="0.1"
 pi_print_any="0.1"
 # pi_ecs_macros="0.1"
 pi_dirty="0.1"
-# pi_share = "0.4"
+pi_share = "0.4"
 # pi_ecs="0.1"
 pi_slotmap_tree="0.2"
 pi_ecs_macros = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
-pi_share = {path="../pi_share"}
+# pi_share = {path="../pi_share"}
 
-[patch."https://github.com/GaiaWorld/pi_ecs"]
-pi_ecs = { path = "../pi_ecs" }
-pi_ecs_macros = { path = "../pi_ecs/macros" }
+# [patch."https://github.com/GaiaWorld/pi_ecs"]
+# pi_ecs = { path = "../pi_ecs" }
+# pi_ecs_macros = { path = "../pi_ecs/macros" }
 
 [dev-dependencies]
 pi_async_graph = "0.3"
@@ -38,6 +38,6 @@ pi_async = "0.5"
 # pi_slotmap_tree = { git = "https://github.com/GaiaWorld/pi_slotmap_tree.git" }
 # pi_dirty = { git = "https://github.com/GaiaWorld/pi_dirty.git" }
 
-[net]
-git-fetch-with-cli = true
-offline = true
+# [net]
+# git-fetch-with-cli = true
+# offline = true
