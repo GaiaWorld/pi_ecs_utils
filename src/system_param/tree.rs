@@ -1,5 +1,3 @@
-use std::{sync::Arc, intrinsics::transmute};
-
 use derive_deref::{Deref, DerefMut};
 use pi_ecs::{entity::Id, archetype::ArchetypeIdent, prelude::{QueryState, World, Write, SystemParamState, SystemState, SystemParamFetch, SystemParam}};
 use pi_slotmap_tree::{Up, Down, Storage, StorageMut, Tree};
@@ -22,7 +20,7 @@ pub struct TreeStorage<A: ArchetypeIdent> {
 	world: World,
 }
 
-impl<A: ArchetypeIdent> Storage<Id<A>> for IdtreeState<A> {
+impl<A: ArchetypeIdent> Storage<Id<A>> for &IdtreeState<A> {
 	fn get_up(&self, k: Id<A>) -> Option<&NodeUp<A>> {
 		self.0.up_query.get(&self.0.world, k)
 	}
@@ -45,7 +43,7 @@ impl<A: ArchetypeIdent> Storage<Id<A>> for IdtreeState<A> {
 	}
 }
 
-struct TreeStorageMut<A: ArchetypeIdent> {
+pub struct TreeStorageMut<A: ArchetypeIdent> {
 	layer_query: QueryState<A, Write<Layer>>,
 	up_query: QueryState<A, Write<NodeUp<A>>>,
 	down_query: QueryState<A, Write<NodeDown<A>>>,
@@ -58,7 +56,7 @@ struct TreeStorageMut<A: ArchetypeIdent> {
     change_tick: u32,
 }
 
-impl<A: ArchetypeIdent> Storage<Id<A>> for IdtreeMutState<A> {
+impl<A: ArchetypeIdent> Storage<Id<A>> for &mut IdtreeMutState<A> {
 	fn get_up(&self, k: Id<A>) -> Option<&NodeUp<A>> {
 		match unsafe { self.0.up_query.get_unchecked_manual(
 			&self.0.world, 
@@ -132,7 +130,7 @@ impl<A: ArchetypeIdent> Storage<Id<A>> for IdtreeMutState<A> {
 	}
 }
 
-impl<A: ArchetypeIdent> StorageMut<Id<A>> for IdtreeMutState<A> {
+impl<A: ArchetypeIdent> StorageMut<Id<A>> for &mut IdtreeMutState<A> {
 	fn get_up_mut(&mut self, k: Id<A>) -> Option<&mut NodeUp<A>> {
 		let r = match unsafe { self.0.up_query.get_unchecked_manual(
 			&self.0.world, 
@@ -278,8 +276,7 @@ impl<A: ArchetypeIdent> StorageMut<Id<A>> for IdtreeMutState<A> {
 	}
 }
 
-#[derive(Clone)]
-pub struct IdtreeState<A: ArchetypeIdent>(Arc<TreeStorage<A>>);
+pub struct IdtreeState<A: ArchetypeIdent>(TreeStorage<A>);
 
 unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeState<A> {
     type Config = ();
@@ -290,32 +287,18 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeState<A> {
     fn init(world: &mut World, system_state: &mut SystemState, _config: Self::Config) -> Self {
 		let (_last_change_tick, _change_tick) = (world.last_change_tick(), world.change_tick());
 
-		let layer_state: Arc<QueryState<A, &'static Layer, ()>> = SystemParamState::init(world, system_state, ());
-		let layer_query = match Arc::try_unwrap(layer_state) {
-			Ok(r) => r,
-			_ => panic!("-----------")
-		};
+		let layer_query: QueryState<A, &'static Layer, ()> = SystemParamState::init(world, system_state, ());
+		let up_query: QueryState<A, &'static NodeUp<A>, ()> = SystemParamState::init(world, system_state, ());
+		let down_query: QueryState<A, &'static NodeDown<A>, ()> = SystemParamState::init(world, system_state, ());
 
-		let up_state: Arc<QueryState<A, &'static NodeUp<A>, ()>> = SystemParamState::init(world, system_state, ());
-		let up_query = match Arc::try_unwrap(up_state) {
-			Ok(r) => r,
-			_ => panic!("-----------")
-		};
-
-		let down_state: Arc<QueryState<A, &'static NodeDown<A>, ()>> = SystemParamState::init(world, system_state, ());
-		let down_query = match Arc::try_unwrap(down_state) {
-			Ok(r) => r,
-			_ => panic!("-----------")
-		};
-
-		IdtreeState(Arc::new(
+		IdtreeState(
 			TreeStorage {
 				layer_query,
 				up_query,
 				down_query,
 				world: world.clone()
 			}
-		))
+		)
     }
 
 	fn apply(&mut self, _world: &mut World) {}
@@ -324,7 +307,7 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeState<A> {
 }
 
 impl<'w, 's, A: ArchetypeIdent> SystemParamFetch<'w, 's> for IdtreeState<A> {
-    type Item = EntityTree<A>;
+    type Item = EntityTree<'s, A>;
 
     #[inline]
     unsafe fn get_param(
@@ -333,15 +316,14 @@ impl<'w, 's, A: ArchetypeIdent> SystemParamFetch<'w, 's> for IdtreeState<A> {
         world: &'w World,
         change_tick: u32,
     ) -> Self::Item {
-		let r = unsafe {&mut *(&*state.0 as *const TreeStorage<A> as usize as *mut TreeStorage<A>)};
-		r.up_query.setting(world, system_state.last_change_tick, change_tick);
-		r.down_query.setting(world, system_state.last_change_tick, change_tick);
-		r.layer_query.setting(world, system_state.last_change_tick, change_tick);
-		EntityTree(Tree::new(IdtreeState(state.0.clone())))
+		state.0.up_query.setting(world, system_state.last_change_tick, change_tick);
+		state.0.down_query.setting(world, system_state.last_change_tick, change_tick);
+		state.0.layer_query.setting(world, system_state.last_change_tick, change_tick);
+		EntityTree(Tree::new(state))
     }
 }
 
-pub struct IdtreeMutState<A: ArchetypeIdent>(Arc<TreeStorageMut<A>>);
+pub struct IdtreeMutState<A: ArchetypeIdent>(TreeStorageMut<A>);
 
 unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeMutState<A> {
     type Config = ();
@@ -352,32 +334,14 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeMutState<A> {
     fn init(world: &mut World, system_state: &mut SystemState, _config: Self::Config) -> Self {
 		let (last_change_tick, change_tick) = (world.last_change_tick(), world.change_tick());
 
-		let layer_state: Arc<QueryState<A, Write<Layer>, ()>> = SystemParamState::init(world, system_state, ());
-		let layer_query = match Arc::try_unwrap(layer_state) {
-			Ok(r) => r,
-			_ => panic!("-----------")
-		};
+		let layer_query: QueryState<A, Write<Layer>, ()> = SystemParamState::init(world, system_state, ());
+		let up_query: QueryState<A, Write<NodeUp<A>>, ()> = SystemParamState::init(world, system_state, ());
 
-		let up_state: Arc<QueryState<A, Write<NodeUp<A>>, ()>> = SystemParamState::init(world, system_state, ());
-		let up_query = match Arc::try_unwrap(up_state) {
-			Ok(r) => r,
-			_ => panic!("-----------")
-		};
+		let down_query: QueryState<A, Write<NodeDown<A>>, ()> = SystemParamState::init(world, system_state, ());
 
-		let down_state: Arc<QueryState<A, Write<NodeDown<A>>, ()>> = SystemParamState::init(world, system_state, ());
+		let root_query: QueryState<A, Write<Root>, ()> = SystemParamState::init(world, system_state, ());
 
-		let root_state: Arc<QueryState<A, Write<Root>, ()>> = SystemParamState::init(world, system_state, ());
-
-		let down_query = match Arc::try_unwrap(down_state) {
-			Ok(r) => r,
-			_ => panic!("-----------")
-		};
-		let root_query = match Arc::try_unwrap(root_state) {
-			Ok(r) => r,
-			_ => panic!("-----------")
-		};
-
-		IdtreeMutState(Arc::new(
+		IdtreeMutState(
 			TreeStorageMut {
 				layer_query,
 				up_query,
@@ -387,7 +351,7 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeMutState<A> {
 				last_change_tick,
 				change_tick
 			}
-		))
+		)
     }
 
 	fn apply(&mut self, _world: &mut World) {}
@@ -396,7 +360,7 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeMutState<A> {
 }
 
 impl<'w, 's, A: ArchetypeIdent> SystemParamFetch<'w, 's> for IdtreeMutState<A> {
-    type Item = EntityTreeMut<A>;
+    type Item = EntityTreeMut<'s, A>;
 
     #[inline]
     unsafe fn get_param(
@@ -405,37 +369,36 @@ impl<'w, 's, A: ArchetypeIdent> SystemParamFetch<'w, 's> for IdtreeMutState<A> {
         world: &'w World,
         change_tick: u32,
     ) -> Self::Item {
-		let r = unsafe {&mut *(&*state.0 as *const TreeStorageMut<A> as usize as *mut TreeStorageMut<A>)};
-		r.up_query.setting(world, system_state.last_change_tick, change_tick);
-		r.down_query.setting(world, system_state.last_change_tick, change_tick);
-		r.layer_query.setting(world, system_state.last_change_tick, change_tick);
-		EntityTreeMut(Tree::new(IdtreeMutState(state.0.clone())))
+		state.0.up_query.setting(world, system_state.last_change_tick, change_tick);
+		state.0.down_query.setting(world, system_state.last_change_tick, change_tick);
+		state.0.layer_query.setting(world, system_state.last_change_tick, change_tick);
+		EntityTreeMut(Tree::new(state))
     }
 }
 
 #[derive(Deref)]
-pub struct EntityTree<A: ArchetypeIdent>(Tree<Id<A>, IdtreeState<A>>);
+pub struct EntityTree<'s, A: ArchetypeIdent>(Tree<Id<A>, &'s IdtreeState<A>>);
 
-impl<A: ArchetypeIdent> Clone for EntityTree<A> {
-	fn clone(&self) -> Self {
-		Self(Tree::new(IdtreeState(self.0.get_storage().0.clone())))
-	}
-}
+// impl<A: ArchetypeIdent> Clone for EntityTree<A> {
+// 	fn clone(&self) -> Self {
+// 		Self(Tree::new(IdtreeState(self.0.get_storage().0.clone())))
+// 	}
+// }
 
 #[derive(Deref, DerefMut)]
-pub struct EntityTreeMut<A: ArchetypeIdent>(Tree<Id<A>,IdtreeMutState<A>>);
+pub struct EntityTreeMut<'s, A: ArchetypeIdent>(Tree<Id<A>, &'s mut IdtreeMutState<A>>);
 
-impl<A: ArchetypeIdent> Clone for EntityTreeMut<A> {
-	fn clone(&self) -> Self {
-		Self(Tree::new(IdtreeMutState(self.0.get_storage().0.clone())))
-	}
-}
+// impl<A: ArchetypeIdent> Clone for EntityTreeMut<A> {
+// 	fn clone(&self) -> Self {
+// 		Self(Tree::new(IdtreeMutState(self.0.get_storage().0.clone())))
+// 	}
+// }
 
 
-impl<A: ArchetypeIdent> SystemParam for EntityTree<A> {
+impl<'s, A: ArchetypeIdent> SystemParam for EntityTree<'s, A> {
     type Fetch = IdtreeState<A>;
 }
 
-impl<A: ArchetypeIdent> SystemParam for EntityTreeMut<A> {
+impl<'s, A: ArchetypeIdent> SystemParam for EntityTreeMut<'s, A> {
     type Fetch = IdtreeMutState<A>;
 }

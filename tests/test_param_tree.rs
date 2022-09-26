@@ -3,8 +3,8 @@
 
 use std::sync::Arc;
 
-use pi_ecs::{prelude::{Query, IntoSystem, StageBuilder, SingleDispatcher, Dispatcher, Res, System}, entity::Entity, world::World, storage::Offset};
-use pi_async::rt::{AsyncRuntime, multi_thread::{MultiTaskRuntimeBuilder, StealableTaskPool}};
+use pi_ecs::{prelude::{Id, Query, IntoSystem, StageBuilder, SingleDispatcher, Dispatcher, Res, System}, world::World, storage::Offset};
+use pi_async::{rt::{AsyncRuntimeBuilder}, prelude::MultiTaskRuntime};
 use pi_ecs_utils::prelude::{Layer, NodeDown, NodeUp, EntityTreeMut, EntityTree};
 use pi_null::Null;
 
@@ -15,7 +15,7 @@ pub struct Node;
 /// 定义一个组件类型
 pub struct Name(pub String);
 
-pub struct RootEntity (Entity);
+pub struct RootEntity (Id<Node>);
 
 /// 测试组件脏
 ///迭代出脏的Position和对应的entity
@@ -24,20 +24,20 @@ pub fn query_tree(
 	root: Res<RootEntity>,
 ) {
 	for k in tree.recursive_iter(root.0) {
-		println!("modify entity_index: {:?}", k.local().offset());
+		println!("modify entity_index: {:?}", k.offset());
 	}
 }
 
 pub fn insert_tree(
 	mut tree: EntityTreeMut<Node>,
-	entitys: Query<Node, Entity>
+	entitys: Query<Node, Id<Node>>
 ) {
 	let mut i = 1;
 	let mut es = Vec::new();
-	es.push(Entity::null());
+	es.push(Id::<Node>::null());
 
 	for e in entitys.iter() {
-		println!("parent: {:?}, {:?}, {}, i:{}", es[i >> 1].local().offset(), e.local().offset(), i >> 2, i);
+		println!("parent: {:?}, {:?}, {}, i:{}", es[i >> 1].offset(), e.offset(), i >> 2, i);
 		tree.insert_child(e, es[i >> 1], std::usize::MAX);
 		es.push(e);
 		i += 1;
@@ -54,8 +54,8 @@ fn test() {
 	// 创建一个名为Node的原型，为该原型注册组件类型（一旦注册，不可修改）
 	world.new_archetype::<Node>()
 		.register::<Layer>()
-		.register::<NodeUp>()
-		.register::<NodeDown>()
+		.register::<NodeUp<Node>>()
+		.register::<NodeDown<Node>>()
 		.create();
 
 	let root = world.spawn::<Node>().id();
@@ -75,16 +75,22 @@ fn test() {
 	dispatcher.run();
 }
 
-fn create_dispatcher(world: &mut World) -> SingleDispatcher<StealableTaskPool<()>> {
-	let rt = AsyncRuntime::Multi(MultiTaskRuntimeBuilder::default().build());
+fn create_dispatcher(world: &mut World) -> SingleDispatcher<MultiTaskRuntime> {
+	let rt = AsyncRuntimeBuilder::default_multi_thread(
+		None,
+		None,
+		None,
+		None,
+	);
 	let iter_dirty_system = query_tree.system(world);
 
 	let mut stage = StageBuilder::new();
 	stage.add_node(iter_dirty_system);
 	
 	let mut stages = Vec::new();
-	stages.push(Arc::new(stage.build()));
-	let dispatcher = SingleDispatcher::new(stages, world, rt);
+	stages.push(Arc::new(stage.build(world)));
+	let mut dispatcher = SingleDispatcher::new( rt);
+	dispatcher.init(stages, world);
 
 	return dispatcher;
 }

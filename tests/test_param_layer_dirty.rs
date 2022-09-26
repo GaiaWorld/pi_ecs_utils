@@ -5,10 +5,10 @@
 
 use std::sync::Arc;
 
-use pi_ecs::{prelude::{Query, IntoSystem, StageBuilder, SingleDispatcher, Dispatcher, Write, System}, entity::Entity, world::World, storage::Offset};
-use pi_ecs::query::filter_change::Changed;
+use pi_ecs::{prelude::{Id, Query, IntoSystem, StageBuilder, SingleDispatcher, Dispatcher, Write, System}, world::World, storage::Offset};
+use pi_ecs::query::Changed;
 use pi_ecs_utils::prelude::{LayerDirty, NodeUp, NodeDown, Layer, EntityTreeMut};
-use pi_async::rt::{AsyncRuntime, multi_thread::{MultiTaskRuntimeBuilder, StealableTaskPool}};
+use pi_async::{rt::AsyncRuntimeBuilder, prelude::MultiTaskRuntime};
 use pi_null::Null;
 
 #[derive(Default)]
@@ -22,28 +22,28 @@ pub struct Name(pub String);
 /// 测试组件脏
 ///迭代出脏的Position和对应的entity
 pub fn iter_dirty(
-	q: Query<Node, (Entity, &Name)>,
+	q: Query<Node, (Id<Node>, &Name)>,
 	dirtys: LayerDirty<Node, Changed<Name>>, // 该声明隐意：world上必须存在Tree<LocalVersion, ()>资源
 ) {
 	for k in dirtys.iter() {
 		let position = q.get(k.clone());
-		println!("modify entity_index: {:?}, name:{:?}", k.local().offset(), position);
+		println!("modify entity_index: {:?}, name:{:?}", k.offset(), position);
 	}
 }
 
-pub struct RootEntity (Entity);
+pub struct RootEntity (Id<Node>);
 
 pub fn create_tree_sys(
 	mut tree: EntityTreeMut<Node>,
-	entitys: Query<Node, Entity>,
+	entitys: Query<Node, Id<Node>>,
 	mut names: Query<Node, Write<Name>>,
 ) {
 	let mut i = 1;
 	let mut es = Vec::new();
-	es.push(Entity::null());
+	es.push(Id::<Node>::null());
 
 	for e in entitys.iter() {
-		println!("parent: {:?}, {:?}, {}, i:{}", es[i >> 1].local().offset(), e.local().offset(), i >> 2, i);
+		println!("parent: {:?}, {:?}, {}, i:{}", es[i >> 1].offset(), e.offset(), i >> 2, i);
 		tree.insert_child(e, es[i >> 1], std::usize::MAX);
 		names.get_mut(e).unwrap().write(Name(format!("{}-{}", i >> 1, i - (i >> 1 << 1))));
 		es.push(e);
@@ -61,8 +61,8 @@ fn test() {
 	world.new_archetype::<Node>()
 		.register::<Name>()
 		.register::<Layer>()
-		.register::<NodeUp>()
-		.register::<NodeDown>()
+		.register::<NodeUp<Node>>()
+		.register::<NodeDown<Node>>()
 		.create();
 
 	let dispatcher = create_dispatcher(&mut world);
@@ -95,8 +95,13 @@ fn test() {
 	std::thread::sleep(std::time::Duration::new(2, 0));
 }
 
-fn create_dispatcher(world: &mut World) -> SingleDispatcher<StealableTaskPool<()>> {
-	let rt = AsyncRuntime::Multi(MultiTaskRuntimeBuilder::default().build());
+fn create_dispatcher(world: &mut World) -> SingleDispatcher<MultiTaskRuntime> {
+	let rt = AsyncRuntimeBuilder::default_multi_thread(
+		None,
+		None,
+		None,
+		None,
+	);
 	let iter_dirty_system = iter_dirty.system(world);
 
 	let mut stage = StageBuilder::new();
@@ -104,7 +109,9 @@ fn create_dispatcher(world: &mut World) -> SingleDispatcher<StealableTaskPool<()
 	
 	let mut stages = Vec::new();
 	stages.push(Arc::new(stage.build(world)));
-	let dispatcher = SingleDispatcher::new(rt);
+	let mut dispatcher = SingleDispatcher::new( rt);
+	dispatcher.init(stages, world);
+
 
 	return dispatcher;
 }
