@@ -5,6 +5,7 @@ use std::{marker::PhantomData, any::TypeId};
 use pi_dirty::{LayerDirty as LayerDirty1, DirtyIterator, ReverseDirtyIterator, PreDirty, NextDirty};
 use pi_ecs::monitor::Delete;
 use pi_ecs::prelude::{AddedFetch, ModifyedFetch, DeletedFetch};
+use pi_ecs::storage::Offset;
 use pi_ecs_macros::all_tuples;
 use pi_hash::XHashMap;
 use pi_map::Map;
@@ -95,7 +96,7 @@ impl<'s, A: ArchetypeIdent, F: WorldQuery> LayerDirty<'s, A, F> {
 
 	pub fn split(&mut self, layer: usize) -> (RemainDirty<A>, OutDirty<A>) {
 		let s = self.state.layer_inner.layer_list.split(layer);
-		(RemainDirty(s.0), OutDirty(s.1, self.state.archetype_id))
+		(RemainDirty(s.0), OutDirty(s.1, self.state.archetype_id, &mut self.state.layer_inner.dirty_mark))
 	}
 
 	pub fn iter_reverse(&mut self) -> LayerReverseDirtyIter<A, F> {
@@ -110,17 +111,17 @@ impl<'s, A: ArchetypeIdent, F: WorldQuery> LayerDirty<'s, A, F> {
 	}
 }
 
-pub struct OutDirty<'a, A: ArchetypeIdent>(NextDirty<'a, Id<A>>, Local);
+pub struct OutDirty<'a, A: ArchetypeIdent>(NextDirty<'a, Id<A>>, Local, &'a mut SecondaryMap<Id<A>, usize>);
 pub struct RemainDirty<'a, A: ArchetypeIdent>(PreDirty<'a, Id<A>>);
 
 impl<'a, A: ArchetypeIdent> OutDirty<'a, A> {
-	pub fn iter(&'a self) -> OutDirtyIter<'a, A> {
+	pub fn iter(&'a mut self) -> OutDirtyIter<'a, A> {
 		let i = self.0.iter();
-		OutDirtyIter(i)
+		OutDirtyIter(i, self.2)
 	}	
 }
 
-pub struct OutDirtyIter<'a, A: ArchetypeIdent>(Iter<'a, Id<A>>);
+pub struct OutDirtyIter<'a, A: ArchetypeIdent>(Iter<'a, Id<A>>, &'a mut SecondaryMap<Id<A>, usize>);
 
 impl<'a, A: ArchetypeIdent> Iterator for OutDirtyIter<'a, A>{
     type Item = Id<A>;
@@ -128,7 +129,10 @@ impl<'a, A: ArchetypeIdent> Iterator for OutDirtyIter<'a, A>{
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
 		match self.0.next() {
-			Some(r) => Some(r.clone()),
+			Some(r) => {
+				self.1.remove(r); // 标记为不脏
+				Some(r.clone())
+			},
 			None => None
 		}
 	}
@@ -371,6 +375,7 @@ macro_rules! impl_install {
 						_:Listen<ComponentListen<A, T, $listen>>,
 						// layers: Query<A, &C>
 					| {
+						
 						// 标记层脏
 						(&mut *(layer as *mut LayerDirtyInner<A>)).insert(Id::new(event.id.local()) , &*(idtree as *const IdtreeState<A>));
 					};

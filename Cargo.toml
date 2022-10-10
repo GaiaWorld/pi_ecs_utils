@@ -5,6 +5,7 @@ authors = ["suncy <suncy@gmail.com>"]
 edition = "2021"
 
 [dependencies]
+log="0.4"
 pi_null="0.1"
 derive_deref = "1.1"
 pi_hash="0.1"
