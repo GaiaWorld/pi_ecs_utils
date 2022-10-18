@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use pi_ecs::{prelude::{Id, Query, IntoSystem, StageBuilder, SingleDispatcher, Dispatcher, Res, System}, world::World, storage::Offset};
 use pi_async::{rt::{AsyncRuntimeBuilder}, prelude::MultiTaskRuntime};
-use pi_ecs_utils::prelude::{Layer, NodeDown, NodeUp, EntityTreeMut, EntityTree};
+use pi_ecs_utils::prelude::{Layer, Down, Up, EntityTreeMut, EntityTree};
 use pi_null::Null;
 
 #[derive(Default)]
@@ -53,9 +53,9 @@ fn test() {
 
 	// 创建一个名为Node的原型，为该原型注册组件类型（一旦注册，不可修改）
 	world.new_archetype::<Node>()
-		.register::<Layer>()
-		.register::<NodeUp<Node>>()
-		.register::<NodeDown<Node>>()
+		.register::<Layer<Node>>()
+		.register::<Up<Node>>()
+		.register::<Down<Node>>()
 		.create();
 
 	let root = world.spawn::<Node>().id();

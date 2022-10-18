@@ -5,7 +5,6 @@ use std::{marker::PhantomData, any::TypeId};
 use pi_dirty::{LayerDirty as LayerDirty1, DirtyIterator, ReverseDirtyIterator, PreDirty, NextDirty};
 use pi_ecs::monitor::Delete;
 use pi_ecs::prelude::{AddedFetch, ModifyedFetch, DeletedFetch};
-use pi_ecs::storage::Offset;
 use pi_ecs_macros::all_tuples;
 use pi_hash::XHashMap;
 use pi_map::Map;
@@ -194,7 +193,7 @@ where
 				// 记录的层次和实际层次相等，并且在idtree中的层次也相等，则返回该值
 				if layer == layer1{
 					if let Some(r) = self.tree.get_layer(*local) {
-						if *r == layer {
+						if r.layer() == layer {
 							// 是否判断changed？TODO
 							// 记录上次迭代出的实体id，下次将对该节点在itree进行先序迭代
 							if let Some(down) = self.tree.get_down(*local) {
@@ -244,8 +243,8 @@ where
 					// 记录的层次和实际层次相等，并且在idtree中的层次也相等，则返回该值
 					if layer == layer1{
 						if let Some(r) = self.tree.get_layer(local.clone()) {
-							if *r == layer {
-								return Some((local.clone(), unsafe { transmute(self.mark_inner as *mut SecondaryMap<Id<A>, usize> as usize as *mut SecondaryMap<Id<A>, usize>) }, *r));
+							if r.layer() == layer {
+								return Some((local.clone(), unsafe { transmute(self.mark_inner as *mut SecondaryMap<Id<A>, usize> as usize as *mut SecondaryMap<Id<A>, usize>) }, r.layer()));
 							}
 						}
 					}
@@ -288,7 +287,7 @@ where
 				// 记录的层次和实际层次相等，并且在idtree中的层次也相等，则返回该值
 				if layer == layer1{
 					if let Some(r) = self.tree.get_layer(local.clone()) {
-						if *r == layer {
+						if r.layer() == layer {
 							// 是否判断changed？TODO
 							// 记录上次迭代出的实体id，下次将对该节点在itree进行先序迭代
 							return Some(local.clone());
@@ -319,7 +318,7 @@ impl<A: ArchetypeIdent> LayerDirtyInner<A> {
 	pub fn insert(&mut self, id: Id<A>, tree: &IdtreeState<A>) {
 		match tree.get_layer(id) {
             Some(r) => {
-                if *r != 0 {
+                if r.layer() != 0 {
 					let d = match self.dirty_mark.get_mut(&id) {
 						Some(r) => r,
 						None => {
@@ -329,9 +328,9 @@ impl<A: ArchetypeIdent> LayerDirtyInner<A> {
 						},
 					};
 					// 新的layer和旧的layer不相等，则记录新的（不删除原来的，在迭代层次脏时，会重现判断层，原有的会自动失效）
-                    if *d != *r {
-                        *d = *r;
-                        self.layer_list.mark(id, *r);
+                    if *d != r.layer() {
+                        *d = r.layer();
+                        self.layer_list.mark(id, r.layer());
                     }
                 }
             }
@@ -524,7 +523,7 @@ unsafe impl<A: ArchetypeIdent, F: WorldQuery + 'static> SystemParamState for Lay
 			// 监听Layer组件（泛型C，实现了GetLayer trait）
 			let listen = move |
 				event: Event,
-				_: Listen<ComponentListen<A, Layer, Modify>>,
+				_: Listen<ComponentListen<A, Layer<A>, Modify>>,
 				// layers: Query<A, &C>,
 			| {
 				// 标记层脏

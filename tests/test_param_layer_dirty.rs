@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use pi_ecs::{prelude::{Id, Query, IntoSystem, StageBuilder, SingleDispatcher, Dispatcher, Write, System}, world::World, storage::Offset};
 use pi_ecs::query::Changed;
-use pi_ecs_utils::prelude::{LayerDirty, NodeUp, NodeDown, Layer, EntityTreeMut};
+use pi_ecs_utils::prelude::{LayerDirty, Up, Down, Layer, EntityTreeMut};
 use pi_async::{rt::AsyncRuntimeBuilder, prelude::MultiTaskRuntime};
 use pi_null::Null;
 
@@ -60,9 +60,9 @@ fn test() {
 	// 创建一个名为Node的原型，为该原型注册组件类型（一旦注册，不可修改）
 	world.new_archetype::<Node>()
 		.register::<Name>()
-		.register::<Layer>()
-		.register::<NodeUp<Node>>()
-		.register::<NodeDown<Node>>()
+		.register::<Layer<Node>>()
+		.register::<Up<Node>>()
+		.register::<Down<Node>>()
 		.create();
 
 	let dispatcher = create_dispatcher(&mut world);

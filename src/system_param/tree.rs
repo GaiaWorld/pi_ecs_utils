@@ -1,52 +1,52 @@
+use std::mem::transmute;
+
 use derive_deref::{Deref, DerefMut};
 use pi_ecs::{entity::Id, archetype::ArchetypeIdent, prelude::{QueryState, World, Write, SystemParamState, SystemState, SystemParamFetch, SystemParam}};
-use pi_slotmap_tree::{Up, Down, Storage, StorageMut, Tree};
+use pi_slotmap_tree::{Up as Up1, Down as Down1, Storage, StorageMut, Tree, Layer as Layer1};
 // use pi_print_any::{println_any, out_any};
-
-#[derive(Debug, Clone, Copy, Deref, Default)]
-pub struct Layer(usize);
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Root;
+pub type Layer<T> = Layer1<Id<T>>;
 
-pub type NodeUp<T> = Up<Id<T>>;
+pub type Up<T> = Up1<Id<T>>;
 
-pub type NodeDown<T> = Down<Id<T>>;
+pub type Down<T> = Down1<Id<T>>;
 
 pub struct TreeStorage<A: ArchetypeIdent> {
-	layer_query: QueryState<A, &'static Layer>,
-	up_query: QueryState<A, &'static NodeUp<A>>,
-	down_query: QueryState<A, &'static NodeDown<A>>,
+	layer_query: QueryState<A, &'static Layer<A>>,
+	up_query: QueryState<A, &'static Up<A>>,
+	down_query: QueryState<A, &'static Down<A>>,
 	world: World,
 }
 
 impl<A: ArchetypeIdent> Storage<Id<A>> for &IdtreeState<A> {
-	fn get_up(&self, k: Id<A>) -> Option<&NodeUp<A>> {
+	fn get_up(&self, k: Id<A>) -> Option<&Up<A>> {
 		self.0.up_query.get(&self.0.world, k)
 	}
-	fn up(&self, k: Id<A>) -> &NodeUp<A> {
+	fn up(&self, k: Id<A>) -> &Up<A> {
 		self.0.up_query.get(&self.0.world, k).unwrap()
 	}
 
-	fn get_layer(&self, k: Id<A>) -> Option<&usize> {
+	fn get_layer(&self, k: Id<A>) -> Option<&Layer<A>> {
 		unsafe { std::mem::transmute(self.0.layer_query.get(&self.0.world,k)) }
 	}
-	fn layer(&self, k: Id<A>) -> usize {
-		self.0.layer_query.get(&self.0.world,k).unwrap().0
+	fn layer(&self, k: Id<A>) -> &Layer<A> {
+		self.0.layer_query.get(&self.0.world,k).unwrap()
 	}
 
-	fn get_down(&self, k: Id<A>) -> Option<&NodeDown<A>> {
+	fn get_down(&self, k: Id<A>) -> Option<&Down<A>> {
 		self.0.down_query.get(&self.0.world,k)
 	}
-	fn down(&self, k: Id<A>) -> &NodeDown<A> {
+	fn down(&self, k: Id<A>) -> &Down<A> {
 		self.0.down_query.get(&self.0.world,k).unwrap()
 	}
 }
 
 pub struct TreeStorageMut<A: ArchetypeIdent> {
-	layer_query: QueryState<A, Write<Layer>>,
-	up_query: QueryState<A, Write<NodeUp<A>>>,
-	down_query: QueryState<A, Write<NodeDown<A>>>,
+	layer_query: QueryState<A, Write<Layer<A>>>,
+	up_query: QueryState<A, Write<Up<A>>>,
+	down_query: QueryState<A, Write<Down<A>>>,
 	root_query:  QueryState<A, Write<Root>>,
 	// common_layer: Commands<Layer>,
 	// common_up: Commands<NodeUp<A>>,
@@ -57,7 +57,7 @@ pub struct TreeStorageMut<A: ArchetypeIdent> {
 }
 
 impl<A: ArchetypeIdent> Storage<Id<A>> for &mut IdtreeMutState<A> {
-	fn get_up(&self, k: Id<A>) -> Option<&NodeUp<A>> {
+	fn get_up(&self, k: Id<A>) -> Option<&Up<A>> {
 		match unsafe { self.0.up_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -70,7 +70,7 @@ impl<A: ArchetypeIdent> Storage<Id<A>> for &mut IdtreeMutState<A> {
 			None => None,
 		}
 	}
-	fn up(&self, k: Id<A>) -> &NodeUp<A> {
+	fn up(&self, k: Id<A>) -> &Up<A> {
 		let r = unsafe {self.0.up_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -83,7 +83,7 @@ impl<A: ArchetypeIdent> Storage<Id<A>> for &mut IdtreeMutState<A> {
 		}
 	}
 
-	fn get_layer(&self, k: Id<A>) -> Option<&usize> {
+	fn get_layer(&self, k: Id<A>) -> Option<&Layer<A>> {
 		match unsafe { self.0.layer_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -95,16 +95,16 @@ impl<A: ArchetypeIdent> Storage<Id<A>> for &mut IdtreeMutState<A> {
 		}
 	}
 
-	fn layer(&self, k: Id<A>) -> usize {
-		**unsafe { self.0.layer_query.get_unchecked_manual(
+	fn layer(&self, k: Id<A>) -> &Layer<A> {
+		unsafe { transmute(self.0.layer_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
 			self.0.last_change_tick, 
 			self.0.change_tick
-		)}.unwrap().get().unwrap()
+		).unwrap().get().unwrap()) }
 	}
 
-	fn get_down(&self, k: Id<A>) -> Option<&NodeDown<A>> {
+	fn get_down(&self, k: Id<A>) -> Option<&Down<A>> {
 		match unsafe { self.0.down_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -117,7 +117,7 @@ impl<A: ArchetypeIdent> Storage<Id<A>> for &mut IdtreeMutState<A> {
 			None => None,
 		}
 	}
-	fn down(&self, k: Id<A>) -> &NodeDown<A> {
+	fn down(&self, k: Id<A>) -> &Down<A> {
 		let r = unsafe { self.0.down_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -131,7 +131,7 @@ impl<A: ArchetypeIdent> Storage<Id<A>> for &mut IdtreeMutState<A> {
 }
 
 impl<A: ArchetypeIdent> StorageMut<Id<A>> for &mut IdtreeMutState<A> {
-	fn get_up_mut(&mut self, k: Id<A>) -> Option<&mut NodeUp<A>> {
+	fn get_up_mut(&mut self, k: Id<A>) -> Option<&mut Up<A>> {
 		let r = match unsafe { self.0.up_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -145,7 +145,7 @@ impl<A: ArchetypeIdent> StorageMut<Id<A>> for &mut IdtreeMutState<A> {
 		};
 		r
 	}
-	fn up_mut(&mut self, k: Id<A>) -> &mut NodeUp<A> {
+	fn up_mut(&mut self, k: Id<A>) -> &mut Up<A> {
 		let mut r = unsafe {self.0.up_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -158,7 +158,7 @@ impl<A: ArchetypeIdent> StorageMut<Id<A>> for &mut IdtreeMutState<A> {
 		}
 	}
 
-	fn set_up(&mut self, k: Id<A>, up: Up<Id<A>>) {
+	fn set_up(&mut self, k: Id<A>, up: Up<A>) {
 		if let Some(mut write_item) = unsafe { self.0.up_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -180,14 +180,14 @@ impl<A: ArchetypeIdent> StorageMut<Id<A>> for &mut IdtreeMutState<A> {
 		}
 	}
 
-	fn set_layer(&mut self, k: Id<A>, layer: usize) {
+	fn set_layer(&mut self, k: Id<A>, layer: Layer<A>) {
 		if let Some(mut write_item) = unsafe { self.0.layer_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
 			self.0.last_change_tick, 
 			self.0.change_tick
 		)} {
-			write_item.write(Layer(layer))
+			write_item.write(layer)
 		}
 	}
 	
@@ -202,7 +202,7 @@ impl<A: ArchetypeIdent> StorageMut<Id<A>> for &mut IdtreeMutState<A> {
 		}
 	}
 
-	fn get_down_mut(&mut self, k: Id<A>) -> Option<&mut NodeDown<A>> {
+	fn get_down_mut(&mut self, k: Id<A>) -> Option<&mut Down<A>> {
 		let r = match unsafe { self.0.down_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -217,7 +217,7 @@ impl<A: ArchetypeIdent> StorageMut<Id<A>> for &mut IdtreeMutState<A> {
 		r
 	}
 
-	fn down_mut(&mut self, k: Id<A>) -> &mut NodeDown<A> {
+	fn down_mut(&mut self, k: Id<A>) -> &mut Down<A> {
 		let mut r = unsafe {self.0.down_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -230,7 +230,7 @@ impl<A: ArchetypeIdent> StorageMut<Id<A>> for &mut IdtreeMutState<A> {
 		}
 	}
 
-	fn set_down(&mut self, k: Id<A>, down: NodeDown<A>) {
+	fn set_down(&mut self, k: Id<A>, down: Down<A>) {
 		if let Some(mut write_item) = unsafe { self.0.down_query.get_unchecked_manual(
 			&self.0.world, 
 			k, 
@@ -287,9 +287,9 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeState<A> {
     fn init(world: &mut World, system_state: &mut SystemState, _config: Self::Config) -> Self {
 		let (_last_change_tick, _change_tick) = (world.last_change_tick(), world.change_tick());
 
-		let layer_query: QueryState<A, &'static Layer, ()> = SystemParamState::init(world, system_state, ());
-		let up_query: QueryState<A, &'static NodeUp<A>, ()> = SystemParamState::init(world, system_state, ());
-		let down_query: QueryState<A, &'static NodeDown<A>, ()> = SystemParamState::init(world, system_state, ());
+		let layer_query: QueryState<A, &'static Layer<A>, ()> = SystemParamState::init(world, system_state, ());
+		let up_query: QueryState<A, &'static Up<A>, ()> = SystemParamState::init(world, system_state, ());
+		let down_query: QueryState<A, &'static Down<A>, ()> = SystemParamState::init(world, system_state, ());
 
 		IdtreeState(
 			TreeStorage {
@@ -334,10 +334,10 @@ unsafe impl<A: ArchetypeIdent> SystemParamState for IdtreeMutState<A> {
     fn init(world: &mut World, system_state: &mut SystemState, _config: Self::Config) -> Self {
 		let (last_change_tick, change_tick) = (world.last_change_tick(), world.change_tick());
 
-		let layer_query: QueryState<A, Write<Layer>, ()> = SystemParamState::init(world, system_state, ());
-		let up_query: QueryState<A, Write<NodeUp<A>>, ()> = SystemParamState::init(world, system_state, ());
+		let layer_query: QueryState<A, Write<Layer<A>>, ()> = SystemParamState::init(world, system_state, ());
+		let up_query: QueryState<A, Write<Up<A>>, ()> = SystemParamState::init(world, system_state, ());
 
-		let down_query: QueryState<A, Write<NodeDown<A>>, ()> = SystemParamState::init(world, system_state, ());
+		let down_query: QueryState<A, Write<Down<A>>, ()> = SystemParamState::init(world, system_state, ());
 
 		let root_query: QueryState<A, Write<Root>, ()> = SystemParamState::init(world, system_state, ());
 
