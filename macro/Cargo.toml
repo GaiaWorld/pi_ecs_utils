@@ -1,0 +1,13 @@
+[package]
+name = "pi_ecs_macro"
+version = "0.1.0"
+authors = ["suncy <suncy@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+toml = "0.5.8"
+syn = "1.0"
+quote = "1.0"
+
+[lib]
+proc-macro = true

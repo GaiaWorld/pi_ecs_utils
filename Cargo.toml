@@ -14,10 +14,21 @@ pi_print_any="0.1"
 # pi_ecs_macros="0.1"
 pi_dirty="0.1"
 pi_share = "0.4"
+pi_time="0.2"
 # pi_ecs="0.1"
 pi_slotmap_tree="0.3"
-pi_ecs_macros = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
-pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
+bevy_ecs="0.9"
+pi_slotmap = "0.1"
+fixedbitset = "0.4"
+pi_graph = "0.1"
+pi_async_graph = "0.3"
+pi_async = "0.5"
+thiserror = "1.0"
+pi_futures = "0.1"
+flume = "0.10"
+pi_ecs_macro = {path = "./macro"}
+
+
 # pi_share = {path="../pi_share"}
 
 # [patch."https://github.com/GaiaWorld/pi_ecs"]
@@ -34,7 +45,8 @@ pi_async = "0.5"
 # [patch."https://github.com/GaiaWorld/pi_ecs"]
 # pi_ecs = { path = "../pi_ecs" }
 [patch.crates-io]
-pi_slotmap_tree = { path="../pi_slotmap_tree"}
+# pi_slotmap_tree = { path="../pi_slotmap_tree"}
+# pi_async_graph = { path="../pi_async_graph" }
 # pi_ecs_macros = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 # pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 # pi_dirty = { git = "https://github.com/GaiaWorld/pi_dirty.git" }

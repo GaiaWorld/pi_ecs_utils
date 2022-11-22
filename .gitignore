@@ -3,3 +3,5 @@
 **/*.rs.bk
 /.cargo
 /Cargo.lock
+/macro/Cargo.lock
+/macro/target
